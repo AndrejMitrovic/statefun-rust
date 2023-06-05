@@ -1,6 +1,6 @@
 # Dockerfile for our SDK worker and data generator
 
-FROM rust:1.46
+FROM rust:1.70
 
 RUN apt-get update && apt-get install -y \
     cmake protobuf-compiler \
@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /usr/src/statefun
 COPY . .
 
-RUN cargo install --path statefun-greeter-example
+RUN cargo -v install --path statefun-greeter-example
 
 ENV RUST_LOG debug
 

@@ -95,7 +95,7 @@ async fn run_consumer(brokers: String, group_id: String, topic: String) {
 
     consumer.subscribe(&[&topic]).expect("Subscribing failed");
 
-    let mut stream = consumer.start();
+    let mut stream = consumer.stream();
 
     while let Some(message) = stream.next().await {
         // it might happen that the broker is not ready, so ignore those failures. There could
