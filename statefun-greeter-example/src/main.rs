@@ -8,6 +8,8 @@ use statefun::{
     Address, Context, Effects, EgressIdentifier, FunctionRegistry, FunctionType, Message, TypeName,
     specs,
 };
+use serde::{Deserialize, Serialize};
+use statefun::{Serializable};
 use types::{EgressRecord, MyUserProfile, UserLogin};
 
 use statefun_greeter_example_proto::example::UserProfile;
@@ -27,6 +29,43 @@ fn main() -> anyhow::Result<()> {
 }
 
 struct StatefulFunctions {}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct SomeValue {
+    x: i32
+}
+
+impl SomeValue {
+    pub fn new(x: i32) -> SomeValue {
+        SomeValue {
+            x
+        }
+    }
+}
+
+impl TypeName for SomeValue {
+    ///
+    fn get_typename() -> &'static str {
+        "greeter.types/SomeValue"
+    }
+}
+
+impl Serializable<SomeValue> for SomeValue {
+    fn serialize(&self, _typename: String) -> Result<Vec<u8>, String> {
+        match serde_json::to_vec(self) {
+            Ok(result) => Ok(result),
+            Err(error) => Err(error.to_string()),
+        }
+    }
+
+    fn deserialize(_typename: String, buffer: &Vec<u8>) -> Result<SomeValue, String> {
+        match serde_json::from_slice::<SomeValue>(buffer) {
+            Ok(result) => Ok(result),
+            Err(error) => Err(error.to_string()),
+        }
+    }
+}
+
 
 impl StatefulFunctions {
     pub fn new() -> StatefulFunctions {
@@ -91,6 +130,8 @@ impl StatefulFunctions {
         profile.set_last_seen_delta_ms(now_ms - last_seen_timestamp_ms);
         let profile = MyUserProfile(profile);
 
+        let some_val = SomeValue::new(123);
+
         effects
             .send(
                 Address::new(Self::greet_function_type(), &login.user_name),
@@ -99,30 +140,43 @@ impl StatefulFunctions {
             .unwrap();
 
         effects
+            .send(
+                Address::new(Self::greet_function_type(), "some_id"),
+                &some_val,
+            )
+            .unwrap();
+
+        effects
     }
 
     pub fn greet(_context: Context, message: Message) -> Effects {
-        let user_profile = match message.get::<MyUserProfile>() {
-            Ok(user_profile) => user_profile.0,
-            Err(error) => panic!("Could not receive MyUserProfile: {:?}", error),
-        };
+        if message.is::<MyUserProfile>() {
+            log::info!("-- Received MyUserProfile");
+        } else if message.is::<SomeValue>() {
+            log::info!("-- Received SomeValue");
+        }
 
-        log::info!("We should greet {:?}", user_profile.get_name());
+        // let user_profile = match message.get::<MyUserProfile>() {
+        //     Ok(user_profile) => user_profile.0,
+        //     Err(error) => panic!("Could not receive MyUserProfile: {:?}", error),
+        // };
 
-        let mut effects = Effects::new();
-        let greetings = Self::create_greetings_message(user_profile);
+        // log::info!("We should greet {:?}", user_profile.get_name());
 
-        let egress_record = EgressRecord {
-            topic: "greetings".to_string(),
-            payload: greetings,
-        };
+        let effects = Effects::new();
+        // let greetings = Self::create_greetings_message(user_profile);
 
-        effects
-            .egress(
-                EgressIdentifier::new("io.statefun.playground", "egress"),
-                &egress_record,
-            )
-            .unwrap();
+        // let egress_record = EgressRecord {
+        //     topic: "greetings".to_string(),
+        //     payload: greetings,
+        // };
+
+        // effects
+        //     .egress(
+        //         EgressIdentifier::new("io.statefun.playground", "egress"),
+        //         &egress_record,
+        //     )
+        //     .unwrap();
 
         effects
     }
